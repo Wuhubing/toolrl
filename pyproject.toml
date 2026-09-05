@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolrl"
+version = "0.1.0"
+description = "Sandboxed multi-turn database tool-use environment for RL post-training (data + env + replay layers)"
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["toolrl*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

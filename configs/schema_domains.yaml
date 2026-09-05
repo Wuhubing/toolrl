@@ -1,0 +1,166 @@
+# ToolRL schema domain definitions.
+#
+# Each domain describes a set of *required* tables (always present) and
+# *optional* tables / optional columns. The schema generator samples the
+# optional pieces with a seeded RNG, so a single domain yields many
+# structurally-distinct schemas. The disjoint train/test split is performed on
+# the resulting *structure* (not the seed rows), which is what "schema-level
+# held-out split" means in this project.
+#
+# Column types: INTEGER | TEXT | REAL | BOOLEAN | TIMESTAMP
+#   - TIMESTAMP values are generated and stored as ISO-8601 strings
+#     ("YYYY-MM-DD HH:MM:SS") so they are portable across SQLite and Postgres
+#     and sort lexicographically == chronologically.
+# Column extras:
+#   - values:    a fixed vocabulary the generator samples from (TEXT columns)
+#   - min / max: value range for numeric columns
+#   - nullable:  whether NULL is permitted (affects DDL + generation)
+# row_count: [min, max] inclusive; the generator samples uniformly per schema.
+
+defaults:
+  id_start: 1
+  timestamp_start: "2020-01-01 00:00:00"
+  timestamp_end: "2024-12-31 23:59:59"
+
+domains:
+  ecommerce:
+    name: e-commerce
+    tables:
+      customers:
+        primary_key: customer_id
+        columns:
+          - {name: customer_id, type: INTEGER}
+          - {name: name, type: TEXT}
+          - {name: region, type: TEXT, values: [North, South, East, West]}
+          - {name: signup_date, type: TIMESTAMP}
+        optional_columns:
+          - {name: email, type: TEXT, nullable: true}
+          - {name: vip, type: BOOLEAN}
+        row_count: [16, 30]
+      products:
+        primary_key: product_id
+        columns:
+          - {name: product_id, type: INTEGER}
+          - {name: name, type: TEXT}
+          - {name: category, type: TEXT, values: [Electronics, Clothing, Home, Books, Toys]}
+          - {name: price, type: REAL, min: 5.0, max: 500.0}
+        row_count: [12, 20]
+      orders:
+        primary_key: order_id
+        columns:
+          - {name: order_id, type: INTEGER}
+          - {name: customer_id, type: INTEGER}
+          - {name: total, type: REAL, min: 10.0, max: 2000.0}
+          - {name: status, type: TEXT, values: [delivered, pending, cancelled]}
+          - {name: created_at, type: TIMESTAMP}
+        foreign_keys:
+          - {column: customer_id, ref_table: customers, ref_column: customer_id}
+        row_count: [40, 80]
+      order_items:
+        primary_key: item_id
+        columns:
+          - {name: item_id, type: INTEGER}
+          - {name: order_id, type: INTEGER}
+          - {name: product_id, type: INTEGER}
+          - {name: quantity, type: INTEGER, min: 1, max: 5}
+          - {name: unit_price, type: REAL, min: 5.0, max: 500.0}
+        foreign_keys:
+          - {column: order_id, ref_table: orders, ref_column: order_id}
+          - {column: product_id, ref_table: products, ref_column: product_id}
+        row_count: [80, 160]
+    optional_tables:
+      returns:
+        primary_key: return_id
+        columns:
+          - {name: return_id, type: INTEGER}
+          - {name: order_id, type: INTEGER}
+          - {name: reason, type: TEXT, values: [damaged, wrong_item, changed_mind]}
+        foreign_keys:
+          - {column: order_id, ref_table: orders, ref_column: order_id}
+        row_count: [5, 15]
+
+  logistics:
+    name: logistics
+    tables:
+      warehouses:
+        primary_key: warehouse_id
+        columns:
+          - {name: warehouse_id, type: INTEGER}
+          - {name: city, type: TEXT, values: [Chicago, Dallas, Seattle, Atlanta, Denver]}
+          - {name: capacity, type: INTEGER, min: 1000, max: 5000}
+        row_count: [5, 10]
+      shipments:
+        primary_key: shipment_id
+        columns:
+          - {name: shipment_id, type: INTEGER}
+          - {name: warehouse_id, type: INTEGER}
+          - {name: carrier, type: TEXT, values: [DHL, FedEx, UPS, USPS]}
+          - {name: destination, type: TEXT, values: [New York, Miami, Phoenix, Boston, Houston]}
+          - {name: weight, type: REAL, min: 1.0, max: 200.0}
+          - {name: status, type: TEXT, values: [in_transit, delivered, delayed, pending]}
+          - {name: shipped_at, type: TIMESTAMP}
+        foreign_keys:
+          - {column: warehouse_id, ref_table: warehouses, ref_column: warehouse_id}
+        row_count: [30, 70]
+      vehicles:
+        primary_key: vehicle_id
+        columns:
+          - {name: vehicle_id, type: INTEGER}
+          - {name: warehouse_id, type: INTEGER}
+          - {name: type, type: TEXT, values: [truck, van, trailer]}
+          - {name: load_capacity, type: REAL, min: 500.0, max: 5000.0}
+        foreign_keys:
+          - {column: warehouse_id, ref_table: warehouses, ref_column: warehouse_id}
+        row_count: [8, 20]
+    optional_tables:
+      drivers:
+        primary_key: driver_id
+        columns:
+          - {name: driver_id, type: INTEGER}
+          - {name: vehicle_id, type: INTEGER}
+          - {name: name, type: TEXT}
+          - {name: years_experience, type: INTEGER, min: 1, max: 20}
+        foreign_keys:
+          - {column: vehicle_id, ref_table: vehicles, ref_column: vehicle_id}
+        row_count: [5, 15]
+
+  hr:
+    name: HR
+    tables:
+      departments:
+        primary_key: department_id
+        columns:
+          - {name: department_id, type: INTEGER}
+          - {name: name, type: TEXT, values: [Engineering, Sales, Marketing, HR, Finance, Operations]}
+        row_count: [4, 8]
+      employees:
+        primary_key: employee_id
+        columns:
+          - {name: employee_id, type: INTEGER}
+          - {name: department_id, type: INTEGER}
+          - {name: name, type: TEXT}
+          - {name: salary, type: REAL, min: 40000.0, max: 250000.0}
+          - {name: hire_date, type: TIMESTAMP}
+          - {name: manager_id, type: INTEGER, nullable: true}
+        foreign_keys:
+          - {column: department_id, ref_table: departments, ref_column: department_id}
+          - {column: manager_id, ref_table: employees, ref_column: employee_id}
+        row_count: [20, 50]
+      projects:
+        primary_key: project_id
+        columns:
+          - {name: project_id, type: INTEGER}
+          - {name: name, type: TEXT}
+          - {name: budget, type: REAL, min: 10000.0, max: 500000.0}
+        row_count: [5, 12]
+    optional_tables:
+      assignments:
+        primary_key: assignment_id
+        columns:
+          - {name: assignment_id, type: INTEGER}
+          - {name: employee_id, type: INTEGER}
+          - {name: project_id, type: INTEGER}
+        foreign_keys:
+          - {column: employee_id, ref_table: employees, ref_column: employee_id}
+          - {column: project_id, ref_table: projects, ref_column: project_id}
+        row_count: [20, 60]
