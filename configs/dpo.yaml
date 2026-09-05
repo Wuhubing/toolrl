@@ -1,0 +1,23 @@
+# ToolRL DPO stage config (TRL DPOTrainer).
+#
+# The DPO stage shapes preferences cheaply before the more expensive/unstable
+# RL stage: preference pairs are (gold trajectory, failed trajectory) for the
+# same task, trained on top of the SFT checkpoint. TRL is used (not veRL) for
+# the same reason as SFT — DPO is a supervised preference loss on HF
+# checkpoints. See README.
+
+model_path: checkpoints/sft/final   # resume from post-SFT checkpoint
+output_dir: checkpoints/dpo
+train_data: data/dpo/train.jsonl
+
+learning_rate: 5e-6
+beta: 0.1
+num_train_epochs: 1.0
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+max_length: 4096
+max_prompt_length: 2048
+num_tasks: 2048
+seed: 42
+save_steps: 500
+logging_steps: 10
