@@ -1,0 +1,42 @@
+task_id: TR-002
+goal: "Build ToolRL's staged post-training pipeline and ablation/eval harness per SPEC.md at the repo root: train/ (sft.py, dpo.py, grpo.py), eval/ (harness.py, ablation.py), configs/schema_domains.yaml, and README — a 3B model post-trained on multi-turn tool calls. SFT -> DPO -> GRPO, each stage's contribution isolated via ablation on the same held-out test set, using the task-success reward from TR-001's env. A GPU and the 3B base weights are NOT available in this environment, so the training scripts and harness must be structured to validate config/inputs locally (imports, CLI, --smoke) while clearly documenting the GPU steps needed to actually run SFT/DPO/GRPO and reproduce 46.7% -> 71.7%."
+context: "SPEC.md at the repo root is authoritative; read it fully first. This stage depends on TR-001 (data/ + env/ + replay/ + configs/) which is merged to main — your worktree's base already contains them. Your worktree's cwd is the repo root. Know cold why the pipeline is staged (SFT establishes tool-call syntax competence; DPO shapes preferences cheaply before the expensive/unstable RL stage; GRPO does final refinement against the true task-success reward). The reward is task-level success — decide and document explicitly whether partial credit for intermediate sub-steps is used. State the isolation unit for rollouts precisely."
+scope:
+  allowed:
+    - "train/**"
+    - "eval/**"
+    - "configs/**"
+    - "tests/**"
+    - "README.md"
+    - "pyproject.toml"
+  forbidden:
+    - "data/**"
+    - "env/**"
+    - "replay/**"
+    - "SPEC.md"
+    - ".agent/**"
+    - ".gitignore"
+    - ".worktrees/**"
+constraints:
+  - "Do not modify data/, env/, replay/, SPEC.md, .agent/**, or .gitignore."
+  - "Training scripts must not require a GPU or a live model to import, validate config, or run a --smoke path; heavy frameworks (torch/trl) import lazily or are validated separately."
+  - "Use TRL as the base; implement custom GRPO where needed. Wire the reward from task_env (task-level success; state partial-credit decision)."
+  - "The ablation harness evaluates base / post-SFT / post-DPO / post-GRPO on the IDENTICAL held-out test set and produces the stage-wise breakdown."
+  - "Do NOT fabricate the 46.7% -> 71.7% numbers — they come from real runs on a GPU; the code must be correct and runnable, and README documents the exact repro steps."
+  - "Reconcile any gap against ground truth by adjusting implementation details, never the numbers."
+acceptance:
+  - "train/sft.py, train/dpo.py, train/grpo.py each define a runnable stage that can be invoked with a config and validate config/inputs locally (no GPU required for import + config validation)."
+  - "The reward policy (task-level success + any partial credit) is explicit and documented."
+  - "eval/harness.py runs the {base, post-SFT, post-DPO, post-GRPO} checkpoints on the identical held-out test set; eval/ablation.py produces the stage-wise accuracy breakdown."
+  - "configs/schema_domains.yaml is valid and reflects at minimum e-commerce, logistics, HR domains."
+  - "README documents the pipeline, the per-stage intuition, the reward definition, the isolation unit, and the exact GPU steps to reproduce 46.7% -> 71.7%."
+  - "Unit tests + a config-validation --smoke pass locally (no GPU)."
+verification:
+  - "python3 -m pytest tests/ -q"
+  - "python3 -c \"from toolrl.train.grpo import GRPOConfig; print('toolrl-train-import-ok')\""
+  - "python3 -c \"import yaml; yaml.safe_load(open('configs/schema_domains.yaml')); print('toolrl-config-ok')\""
+worker:
+  type: deep
+max_attempts: 2
+risk: high
+timeout_min: 120

@@ -1,0 +1,40 @@
+task_id: TR-001
+goal: "Build ToolRL's data + environment layers per SPEC.md at the repo root: the schema generator with a disjoint schema-level train/test split (2.1), the multi-turn task generator (2.1), the sandboxed rollout environment (2.2), the persistent multi-turn task environment (2.3), execution tracing plus deterministic replay (2.5), and configs/schema_domains.yaml. Python 3.11+. The DB backend must be abstracted so every module is unit-testable WITHOUT a live Postgres/Docker (tests use an in-memory/fake backend); the real sandbox provisions Postgres via Docker."
+context: "SPEC.md at the repo root is authoritative; read it fully first. Greenfield repo: base branch main holds only SPEC.md and .agent/config.yaml. Your worktree's cwd is the repo root. The disjoint split MUST be schema-level (test tasks use schemas never seen in training, not just different queries on seen schemas) — this is the correctness keystone; implement and test the provable zero-overlap guarantee. Choose and justify the isolation unit (container-per-rollout vs namespace-per-rollout) in docstrings. Every rollout logs initial schema + seed + full action trace. The reward is task-level success as the primary signal — state explicitly whether partial credit is used (this changes what GRPO optimizes later)."
+scope:
+  allowed:
+    - "data/**"
+    - "env/**"
+    - "replay/**"
+    - "configs/**"
+    - "tests/**"
+    - "pyproject.toml"
+    - "README.md"
+  forbidden:
+    - "train/**"
+    - "eval/**"
+    - "SPEC.md"
+    - ".agent/**"
+    - ".gitignore"
+constraints:
+  - "Do not modify SPEC.md, .agent/**, or .gitignore, nor create files under train/ or eval/."
+  - "No Docker or live Postgres required to run the test suite — the backend is abstracted (in-memory fake for tests; real provisioned Postgres for production use)."
+  - "Enforce a schema-level train/test split provably disjoint: a helper asserts no train schema (or near-duplicate) appears in test."
+  - "task_env.step(tool_call) -> (result, done, info); turn-limit exhaustion is a defined failure mode counted as a failure, not silently truncated."
+  - "Guaranteed teardown even on rollout failure/timeout."
+  - "Deterministic: given the same schema + seed + action trace, replay reconstructs the exact pre-rollout state."
+acceptance:
+  - "schema_generator produces varied, structurally-plausible schemas parameterized by domain (at minimum e-commerce, logistics, HR)."
+  - "A disjoint split function returns train/test schema sets whose intersection is empty (near-duplicate check passes); this is unit-tested."
+  - "task_generator emits multi-step natural-language goals requiring 2+ dependent tool calls (asserted in tests)."
+  - "task_env.step returns (result, done, info); turn-limit exhaustion yields done=True with a failure marker."
+  - "tracer records every executed SQL statement + result + timing per rollout; replay(rollout_log) reconstructs the environment to the exact pre-rollout state (tested with the fake backend)."
+  - "Full unit test suite passes."
+verification:
+  - "python3 -m pytest tests/ -q"
+  - "python3 -c \"from toolrl.data.schema_generator import SchemaGenerator; print('toolrl-data-import-ok')\""
+worker:
+  type: deep
+max_attempts: 2
+risk: high
+timeout_min: 90
