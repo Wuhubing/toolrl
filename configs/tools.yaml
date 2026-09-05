@@ -1,0 +1,32 @@
+# ToolRL tool registry for veRL's tool agent loop.
+#
+# Referenced by `actor_rollout_ref.rollout.multi_turn.tool_config_path` in
+# configs/verl_grpo.yaml. Registers the single `toolrl` tool (a veRL BaseTool
+# wrapping ToolRL's TaskEnv); veRL constructs the OpenAI tool schema from the
+# inline `tool_schema` below. Format follows verl/tools/tool_registry.py.
+
+tools:
+  - class_name: toolrl.train.verl_tool.ToolRLTool
+    config:
+      type: native
+      backend: sqlite        # or postgres (+ dsn) for production
+      max_turns: 10          # TaskEnv turn limit
+    tool_schema:
+      type: function
+      function:
+        name: toolrl
+        description: "Interact with the sandbox SQL database. Use action='query' to run one SQL statement and action='finish' to submit the final answer."
+        parameters:
+          type: object
+          properties:
+            action:
+              type: string
+              enum: [query, finish]
+              description: "Which action to perform."
+            sql:
+              type: string
+              description: "SQL to execute (only when action='query')."
+            answer:
+              type: [string, number, "null"]
+              description: "Final answer to submit (only when action='finish')."
+          required: [action]

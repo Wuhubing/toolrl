@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toolrl"
 version = "0.1.0"
-description = "Sandboxed multi-turn database tool-use environment for RL post-training (data + env + replay layers)"
+description = "Sandboxed multi-turn database tool-use environment for RL post-training (data + env + replay + train + eval)"
 requires-python = ">=3.11"
 dependencies = [
   "PyYAML>=6.0",
@@ -13,6 +13,12 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.1"]
+# SFT/DPO stages (TRL). torch/transformers/datasets are pulled in transitively;
+# pin only what is safe. veRL (GRPO stage) is installed separately per veRL's
+# own instructions — it pins specific torch/vllm/ray versions, do NOT guess here.
+trl = ["trl>=0.9", "transformers>=4.44", "datasets>=2.14", "accelerate>=0.30"]
+# Eval harness with a real HF checkpoint (LLMPolicy).
+eval = ["transformers>=4.44", "torch>=2.0", "accelerate>=0.30"]
 test = ["pytest>=7.0"]
 
 [tool.setuptools.packages.find]
