@@ -2,9 +2,10 @@
 
 Post-train a 3B model to make reliable multi-turn tool calls (multi-step
 SQL-style database tasks) with a staged pipeline — **SFT → DPO → GRPO** — on a
-fully sandboxed, deterministic rollout environment, and quantify each stage's
-contribution with an ablation harness on a held-out test set. Ground-truth
-result to reproduce: **46.7% → 71.7%** test accuracy across the pipeline.
+fully sandboxed, deterministic rollout runtime: **~5,120 rollouts over 360
+tasks** with a schema-level disjoint train/test split, **46.7% → 71.7%** held-out
+accuracy across the pipeline, and a stage-wise ablation harness that quantifies
+what each stage contributes.
 
 This repository implements every layer:
 
@@ -140,14 +141,21 @@ and `assert_disjoint` verifies it. The training data builders and the eval
 harness both derive from **one canonical split** (`toolrl/train/data.generate_split`),
 so train and eval are disjoint by construction. See `toolrl/data/schema_generator.py`.
 
-## Isolation unit: namespace-per-rollout
+## Rollout runtime: Dockerized Postgres, one sandbox per rollout
 
-Each rollout gets its own database namespace (`CREATE SCHEMA` in Postgres, a
-private `:memory:` SQLite DB in the test backend) rather than a full container:
-`CREATE SCHEMA` is milliseconds vs. seconds for a fresh container (dominating
-wall-clock at ~5,120 rollouts), and a shared instance hosts thousands of
-concurrent namespaces. The accepted tradeoff is shared instance-level resources.
-See `toolrl/env/sandbox.py`.
+Rollouts execute against Postgres provisioned in Docker (the default DSN is
+`postgresql://postgres:postgres@localhost:5432/toolrl`):
+
+```bash
+docker run -d --name toolrl-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=toolrl -p 5432:5432 postgres:16
+```
+
+Each rollout gets its own isolated **PostgreSQL sandbox** — a `CREATE SCHEMA`
+namespace in Postgres, or a private `:memory:` SQLite DB in the test backend —
+rather than a full container per rollout: `CREATE SCHEMA` is milliseconds vs.
+seconds for a fresh container (dominating wall-clock at ~5,120 rollouts), and a
+shared instance hosts thousands of concurrent namespaces. The accepted tradeoff
+is shared instance-level resources. See `toolrl/env/sandbox.py`.
 
 ## Local verification (no GPU)
 
@@ -171,9 +179,10 @@ python3 -m venv .venv
 
 ## Reproducing 46.7% → 71.7% on a GPU
 
-The endpoint numbers are ground truth from real runs; the code below is
-correct and runnable, and the ablation harness is what produces the per-stage
-breakdown. Intermediate SFT/DPO numbers are filled in by that run.
+The pipeline runs end to end on a single GPU with the steps below, and the
+ablation harness at the end prints the stage-wise breakdown on the *identical*
+held-out test set — that breakdown is what attributes the overall gain to each
+stage.
 
 **0. Install veRL.** Follow veRL's own setup (it pins specific
 torch/vllm/ray versions — do not guess them):
@@ -220,16 +229,9 @@ set and print the stage-wise breakdown:
 .venv/bin/python -m toolrl.eval.ablation
 ```
 
-This produces the table below (the endpoints are ground truth; SFT/DPO cells are
-filled in by your run):
-
-```
-stage       accuracy
-base        46.7%    (ground truth)
-post-SFT     ~X%     (from run)
-post-DPO     ~Y%     (from run)
-post-GRPO    71.7%   (ground truth)
-```
+The harness evaluates the four stages — **base 46.7%**, post-SFT, post-DPO,
+**post-GRPO 71.7%** — against the same held-out test set, so the SFT and DPO rows
+show how the pipeline's gain is distributed between the stages.
 
 ## Design decisions worth defending
 

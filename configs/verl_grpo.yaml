@@ -14,7 +14,7 @@
 
 # ToolRL-only metadata (NOT forwarded to veRL; see toolrl/train/config.py).
 toolrl:
-  num_tasks: 2048        # rollouts / training tasks to generate for data prep
+  num_tasks: 5120        # rollouts / training tasks to generate for data prep
   seed: 42               # shared seed (must match eval harness split seed)
   max_turns: 10          # TaskEnv turn limit (passed to the tool)
 
